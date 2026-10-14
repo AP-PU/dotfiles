@@ -1,0 +1,79 @@
+{
+  "bar": {
+    "centerAnchor": "lohith.workspaces",
+    "id": "lohith.bar",
+    "layout": {
+      "center": [
+        {
+          "id": "lohith.workspaces"
+        }
+      ],
+      "left": [
+        {
+          "format": "HH:mm  dd/MM/yyyy",
+          "formatAlt": "HH:mm:ss  dddd, MMMM d, yyyy",
+          "id": "lohith.clock"
+        },
+        {
+          "id": "lohith.wallpapers"
+        },
+        {
+          "id": "lohith.weather"
+        }
+      ],
+      "right": [
+        {
+          "id": "akshar.radio-atlas"
+        },
+        {
+          "id": "lohith.nightlight"
+        },
+        {
+          "alwaysShow": true,
+          "id": "omarchy.indicators",
+          "items": [
+            "ScreenRecording",
+            "StayAwake"
+          ]
+        },
+        {
+          "id": "omarchy.audio"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.power",
+          "showPercentage": true
+        },
+        {
+          "id": "lohith.tray"
+        }
+      ]
+    },
+    "position": "top",
+    "transparent": false
+  },
+  "cloneSourceRestores": [
+    "lohith.lock"
+  ],
+  "disabledPlugins": [
+    "omarchy.lock"
+  ],
+  "idle": {
+    "lock": 300,
+    "screensaver": 150
+  },
+  "plugins": [
+    {
+      "id": "io.github.samjage.background-umami"
+    },
+    {
+      "id": "lohith.lock"
+    }
+  ],
+  "version": 1
+}

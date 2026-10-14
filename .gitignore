@@ -1,0 +1,19 @@
+# Backups and temporary files
+*.bak
+*.bak.*
+*.backup
+*.orig
+*~
+*.swp
+*.swo
+
+# OS and file manager metadata
+.DS_Store
+Thumbs.db
+.directory
+
+# Logs and runtime caches
+*.log
+.cache/
+*.sock
+*.sock.pid

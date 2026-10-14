@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""
+Omarchy Idle & Screensaver Inhibitor Daemon
+Prevents screensaver and idle lock when:
+  1. Any audio is actively playing (via PipeWire / PulseAudio)
+  2. Any media is playing (via MPRIS D-Bus interface)
+  3. Any application requests screensaver inhibition via D-Bus
+     (org.freedesktop.ScreenSaver or org.freedesktop.PowerManagement.Inhibit)
+"""
+
+import sys
+import os
+import signal
+import subprocess
+import select
+import threading
+import logging
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+from gi.repository import GLib
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+log = logging.getLogger("omarchy-idle-inhibit")
+
+WAYLAND_INHIBIT_BIN = os.path.expanduser("~/.local/bin/omarchy-wayland-idle-inhibit")
+
+class IdleInhibitDaemon:
+    def __init__(self, loop, bus):
+        self.loop = loop
+        self.bus = bus
+        self.inhibitor_proc = None
+        self.inhibited = False
+
+        # Cookie management for D-Bus callers
+        self.cookie_counter = 1
+        self.cookies = {}  # cookie -> {"sender": sender, "app": app, "reason": reason}
+
+        # Media states
+        self.audio_playing = False
+        self.mpris_playing = False
+
+        # Register D-Bus services
+        self.setup_dbus_services()
+
+        # Watch D-Bus name owner changes to clean up crashed clients
+        self.bus.add_signal_receiver(
+            self.on_name_owner_changed,
+            signal_name="NameOwnerChanged",
+            dbus_interface="org.freedesktop.DBus"
+        )
+
+        # Watch MPRIS property changes
+        self.bus.add_signal_receiver(
+            self.on_mpris_properties_changed,
+            signal_name="PropertiesChanged",
+            dbus_interface="org.freedesktop.DBus.Properties",
+            path="/org/mpris/MediaPlayer2"
+        )
+
+        # Setup audio monitoring thread (pactl subscribe)
+        self.subscribe_running = True
+        self.audio_thread = threading.Thread(target=self.audio_monitor_thread, daemon=True)
+        self.audio_thread.start()
+
+        # Periodic check every 2 seconds for heartbeat synchronization
+        GLib.timeout_add_seconds(2, self.periodic_check)
+
+        # Initial check
+        self.check_all()
+
+    def setup_dbus_services(self):
+        try:
+            self.screensaver_name = dbus.service.BusName("org.freedesktop.ScreenSaver", self.bus, do_not_queue=True)
+            self.screensaver_obj = ScreenSaverService(self, self.screensaver_name)
+            log.info("Registered D-Bus interface: org.freedesktop.ScreenSaver")
+        except Exception as e:
+            log.warning(f"Could not register org.freedesktop.ScreenSaver: {e}")
+
+        try:
+            self.pm_name = dbus.service.BusName("org.freedesktop.PowerManagement.Inhibit", self.bus, do_not_queue=True)
+            self.pm_obj = PowerManagementService(self, self.pm_name)
+            log.info("Registered D-Bus interface: org.freedesktop.PowerManagement.Inhibit")
+        except Exception as e:
+            log.warning(f"Could not register org.freedesktop.PowerManagement.Inhibit: {e}")
+
+    def add_inhibit(self, sender, app_name, reason):
+        cookie = self.cookie_counter
+        self.cookie_counter += 1
+        self.cookies[cookie] = {
+            "sender": sender,
+            "app": str(app_name),
+            "reason": str(reason)
+        }
+        log.info(f"D-Bus inhibit added: cookie={cookie}, app='{app_name}', reason='{reason}', sender={sender}")
+        self.update_inhibition()
+        return cookie
+
+    def remove_inhibit(self, cookie):
+        if cookie in self.cookies:
+            info = self.cookies.pop(cookie)
+            log.info(f"D-Bus inhibit removed: cookie={cookie}, app='{info['app']}'")
+            self.update_inhibition()
+            return True
+        return False
+
+    def on_name_owner_changed(self, name, old_owner, new_owner):
+        # If a client disconnected, remove its cookies
+        if not new_owner:
+            to_remove = [c for c, info in self.cookies.items() if info["sender"] == name or info["sender"] == old_owner]
+            for c in to_remove:
+                info = self.cookies.pop(c)
+                log.info(f"D-Bus client disconnected, removing inhibit: cookie={c}, app='{info['app']}'")
+            if to_remove:
+                self.update_inhibition()
+
+    def on_mpris_properties_changed(self, interface, changed_props, invalidated_props, path=None):
+        if "PlaybackStatus" in changed_props:
+            GLib.idle_add(self.check_mpris)
+
+    def check_audio_playing(self):
+        try:
+            out = subprocess.check_output(
+                ["pactl", "list", "sink-inputs"],
+                text=True,
+                stderr=subprocess.DEVNULL
+            )
+            inputs = out.split("Sink Input #")
+            for inp in inputs[1:]:
+                # Ignore muted or corked (paused) streams
+                if "Corked: yes" in inp:
+                    continue
+                if "Mute: yes" in inp:
+                    continue
+                return True
+        except Exception:
+            pass
+        return False
+
+    def check_mpris(self):
+        playing = False
+        try:
+            for name in self.bus.list_names():
+                if name.startswith("org.mpris.MediaPlayer2."):
+                    try:
+                        obj = self.bus.get_object(name, "/org/mpris/MediaPlayer2")
+                        props = dbus.Interface(obj, "org.freedesktop.DBus.Properties")
+                        status = str(props.Get("org.mpris.MediaPlayer2.Player", "PlaybackStatus"))
+                        if status == "Playing":
+                            playing = True
+                            break
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        if playing != self.mpris_playing:
+            self.mpris_playing = playing
+            log.info(f"MPRIS playback status changed: playing={self.mpris_playing}")
+            self.update_inhibition()
+
+    def audio_monitor_thread(self):
+        """Continuously listen to pactl subscribe events for instant notification."""
+        while self.subscribe_running:
+            proc = None
+            try:
+                proc = subprocess.Popen(
+                    ["pactl", "subscribe"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True
+                )
+                while self.subscribe_running and proc.poll() is None:
+                    r, _, _ = select.select([proc.stdout], [], [], 1.0)
+                    if r:
+                        line = proc.stdout.readline()
+                        if not line:
+                            break
+                        if "sink-input" in line:
+                            GLib.idle_add(self.on_sink_input_event)
+            except Exception as e:
+                pass
+            finally:
+                if proc and proc.poll() is None:
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=1.0)
+                    except Exception:
+                        pass
+            if self.subscribe_running:
+                import time
+                time.sleep(1.0)
+
+    def on_sink_input_event(self):
+        new_audio = self.check_audio_playing()
+        if new_audio != self.audio_playing:
+            self.audio_playing = new_audio
+            log.info(f"PipeWire audio state changed: playing={self.audio_playing}")
+            self.update_inhibition()
+
+    def periodic_check(self):
+        self.check_all()
+        return True  # keep GLib timer running
+
+    def check_all(self):
+        new_audio = self.check_audio_playing()
+        if new_audio != self.audio_playing:
+            self.audio_playing = new_audio
+            log.info(f"Periodic check: audio playing={self.audio_playing}")
+
+        self.check_mpris()
+        self.update_inhibition()
+
+    def update_inhibition(self):
+        should_inhibit = bool(self.cookies) or self.audio_playing or self.mpris_playing
+
+        if should_inhibit and not self.inhibited:
+            self.start_inhibitor()
+        elif not should_inhibit and self.inhibited:
+            self.stop_inhibitor()
+
+    def start_inhibitor(self):
+        if self.inhibitor_proc and self.inhibitor_proc.poll() is None:
+            self.inhibited = True
+            return
+
+        reasons = []
+        if self.cookies:
+            apps = [info['app'] for info in self.cookies.values()]
+            reasons.append(f"D-Bus: {', '.join(apps)}")
+        if self.audio_playing:
+            reasons.append("Audio playing")
+        if self.mpris_playing:
+            reasons.append("MPRIS media playing")
+
+        log.info(f"Activating Wayland idle inhibitor ({' | '.join(reasons)})")
+
+        try:
+            self.inhibitor_proc = subprocess.Popen(
+                [WAYLAND_INHIBIT_BIN],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+            # Read first line to confirm activation
+            line = self.inhibitor_proc.stdout.readline().strip()
+            if line == "ACTIVE":
+                self.inhibited = True
+                log.info("Wayland idle inhibitor active.")
+            else:
+                log.warning(f"Unexpected response from inhibitor: {line}")
+        except Exception as e:
+            log.error(f"Failed to start Wayland inhibitor: {e}")
+            self.inhibitor_proc = None
+            self.inhibited = False
+
+    def stop_inhibitor(self):
+        log.info("Deactivating Wayland idle inhibitor (no active media or requests)")
+        if self.inhibitor_proc:
+            try:
+                if self.inhibitor_proc.stdin:
+                    self.inhibitor_proc.stdin.close()
+                self.inhibitor_proc.terminate()
+                self.inhibitor_proc.wait(timeout=1.0)
+            except Exception:
+                pass
+            self.inhibitor_proc = None
+        self.inhibited = False
+        log.info("Wayland idle inhibitor deactivated.")
+
+    def cleanup(self):
+        self.subscribe_running = False
+        self.stop_inhibitor()
+
+
+class ScreenSaverService(dbus.service.Object):
+    def __init__(self, daemon, bus_name):
+        super().__init__(bus_name, "/org/freedesktop/ScreenSaver")
+        self.daemon = daemon
+
+    @dbus.service.method("org.freedesktop.ScreenSaver", in_signature="ss", out_signature="u", sender_keyword="sender")
+    def Inhibit(self, app_name, reason, sender=None):
+        return self.daemon.add_inhibit(sender, app_name, reason)
+
+    @dbus.service.method("org.freedesktop.ScreenSaver", in_signature="u", out_signature="")
+    def UnInhibit(self, cookie):
+        self.daemon.remove_inhibit(cookie)
+
+    @dbus.service.method("org.freedesktop.ScreenSaver", in_signature="", out_signature="b")
+    def GetActive(self):
+        return False
+
+    @dbus.service.method("org.freedesktop.ScreenSaver", in_signature="", out_signature="")
+    def SimulateUserActivity(self):
+        pass
+
+
+class PowerManagementService(dbus.service.Object):
+    def __init__(self, daemon, bus_name):
+        super().__init__(bus_name, "/org/freedesktop/PowerManagement/Inhibit")
+        self.daemon = daemon
+
+    @dbus.service.method("org.freedesktop.PowerManagement.Inhibit", in_signature="ss", out_signature="u", sender_keyword="sender")
+    def Inhibit(self, app_name, reason, sender=None):
+        return self.daemon.add_inhibit(sender, app_name, reason)
+
+    @dbus.service.method("org.freedesktop.PowerManagement.Inhibit", in_signature="u", out_signature="")
+    def UnInhibit(self, cookie):
+        self.daemon.remove_inhibit(cookie)
+
+    @dbus.service.method("org.freedesktop.PowerManagement.Inhibit", in_signature="", out_signature="b")
+    def HasInhibit(self):
+        return self.daemon.inhibited
+
+
+def main():
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SessionBus()
+    loop = GLib.MainLoop()
+
+    daemon = IdleInhibitDaemon(loop, bus)
+
+    def sig_handler(sig, frame):
+        log.info("Received termination signal, shutting down...")
+        daemon.cleanup()
+        loop.quit()
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    log.info("Omarchy Idle Inhibit Daemon started.")
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

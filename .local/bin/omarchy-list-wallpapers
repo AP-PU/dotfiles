@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+import os
+import json
+import sys
+import hashlib
+
+def get_images():
+    dirs = [
+        os.path.expanduser("~/.config/omarchy/backgrounds"),
+        os.path.expanduser("~/Pictures"),
+        os.path.realpath(os.path.expanduser("~/Downloads")),
+        os.path.expanduser("~/Downloads"),
+    ]
+    
+    # Load Wallhaven manifest database if available
+    manifest_path = os.path.expanduser("~/Pictures/Wallpapers/wallhaven_pack_manifest.json")
+    manifest_by_path = {}
+    manifest_by_id = {}
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r") as fp:
+                manifest_items = json.load(fp)
+                for item in manifest_items:
+                    p = os.path.realpath(item.get("path", ""))
+                    manifest_by_path[p] = item
+                    base_no_ext = os.path.splitext(p)[0]
+                    manifest_by_path[base_no_ext] = item
+                    wid = item.get("id")
+                    if wid:
+                        manifest_by_id[wid.lower()] = item
+        except Exception:
+            pass
+
+    valid_exts = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".bmp"}
+    images = []
+    seen_paths = set()
+    seen_fingerprints = set()
+    seen_names = set()
+    
+    for d in dirs:
+        if not os.path.exists(d):
+            continue
+        for root, _, files in os.walk(d):
+            for f in sorted(files):
+                ext = os.path.splitext(f)[1].lower()
+                if ext in valid_exts:
+                    if "screenshot" in f.lower():
+                        continue
+                    full_path = os.path.realpath(os.path.join(root, f))
+                    if full_path in seen_paths or not os.path.isfile(full_path):
+                        continue
+                    
+                    try:
+                        size = os.path.getsize(full_path)
+                        if size < 5120:
+                            continue
+                        # Fast content fingerprint: size + head + tail hash
+                        with open(full_path, "rb") as fp:
+                            head = fp.read(65536)
+                            fp.seek(max(0, size - 65536))
+                            tail = fp.read(65536)
+                            fp_hash = hashlib.sha256(head + tail).hexdigest()
+                        fingerprint = (size, fp_hash)
+                    except Exception:
+                        continue
+                    
+                    seen_paths.add(full_path)
+                    
+                    # Deduplicate: never display the same image content or duplicate basename
+                    norm_name = os.path.splitext(f)[0].lower().replace("-", " ").replace("_", " ").strip()
+                    if fingerprint in seen_fingerprints or norm_name in seen_names:
+                        continue
+                    
+                    seen_fingerprints.add(fingerprint)
+                    seen_names.add(norm_name)
+                    
+                    folder = os.path.basename(os.path.dirname(full_path))
+                    name = os.path.splitext(f)[0]
+                    clean_name = name.replace("-", " ").replace("_", " ").strip()
+                    mtime = os.path.getmtime(full_path)
+
+                    # Determine metadata from manifest
+                    base_no_ext = os.path.splitext(full_path)[0]
+                    meta = manifest_by_path.get(full_path) or manifest_by_path.get(base_no_ext)
+                    if not meta and name.lower().startswith("wallhaven-"):
+                        wid = name.lower().split("wallhaven-")[-1]
+                        meta = manifest_by_id.get(wid)
+
+                    category = folder
+                    display_title = clean_name.capitalize() if clean_name.islower() else clean_name
+                    purity_from_meta = meta.get("purity") if meta else None
+
+                    if meta:
+                        category = meta.get("category", folder)
+                        title_candidate = meta.get("title", "")
+                        if title_candidate:
+                            display_title = title_candidate
+
+                    # Explicitly separate Sexy (Baddies: Goths, Mommies, Cuties) vs Normal
+                    path_lower = full_path.lower()
+                    folder_lower = folder.lower()
+                    cat_lower = str(category).lower()
+                    is_sexy = (
+                        any(k in path_lower or k in folder_lower or k in cat_lower for k in ["baddies", "goths", "mommies", "cuties", "gyattt"])
+                        or purity_from_meta == "sketchy"
+                        or (meta is not None and meta.get("main_group", "").lower() == "baddies")
+                    )
+
+                    purity = "sketchy" if is_sexy else "sfw"
+                    purityLabel = "Sexy" if is_sexy else "Normal"
+                    section = "sexy" if is_sexy else "normal"
+
+                    # Fast pre-cached thumbnail lookup
+                    thumb_hash = hashlib.sha1(full_path.encode()).hexdigest()
+                    thumb_path = os.path.expanduser(f"~/.cache/omarchy/wallpaper_thumbs/{thumb_hash}.jpg")
+                    thumbnail = thumb_path if (os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 1024) else full_path
+
+                    images.append({
+                        "name": display_title,
+                        "filename": f,
+                        "path": full_path,
+                        "thumbnail": thumbnail,
+                        "folder": folder,
+                        "category": category,
+                        "is_sexy": is_sexy,
+                        "section": section,
+                        "purity": purity,
+                        "purityLabel": purityLabel,
+                        "mtime": mtime
+                    })
+    
+    # Sort newest first
+    images.sort(key=lambda x: x["mtime"], reverse=True)
+    return images
+
+if __name__ == "__main__":
+    imgs = get_images()
+    print(json.dumps(imgs))

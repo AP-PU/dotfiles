@@ -1,0 +1,3 @@
+#!/bin/bash
+# umami-background-hook
+if [[ -x $HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-pin-apply ]]; then exec $HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-pin-apply "$@"; fi

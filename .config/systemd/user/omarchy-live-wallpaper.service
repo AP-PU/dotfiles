@@ -1,0 +1,13 @@
+[Unit]
+Description=Omarchy Live Video Wallpaper Daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/omarchy-live-wallpaper run
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=graphical-session.target

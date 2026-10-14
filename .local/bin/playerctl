@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+import sys
+import time
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+def get_players(bus):
+    return [name for name in bus.list_names() if name.startswith('org.mpris.MediaPlayer2.')]
+
+def get_active_player(bus):
+    players = get_players(bus)
+    if not players:
+        return None
+    # Prefer playing
+    for p in players:
+        try:
+            proxy = bus.get_object(p, '/org/mpris/MediaPlayer2')
+            props = dbus.Interface(proxy, 'org.freedesktop.DBus.Properties')
+            status = props.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus')
+            if status == 'Playing':
+                return p
+        except Exception:
+            pass
+    return players[0]
+
+def get_metadata(bus, player_name):
+    try:
+        proxy = bus.get_object(player_name, '/org/mpris/MediaPlayer2')
+        props = dbus.Interface(proxy, 'org.freedesktop.DBus.Properties')
+        status = str(props.Get('org.mpris.MediaPlayer2.Player', 'PlaybackStatus'))
+        meta = props.Get('org.mpris.MediaPlayer2.Player', 'Metadata')
+        title = str(meta.get('xesam:title', ''))
+        artist_val = meta.get('xesam:artist', [])
+        artist = str(artist_val[0]) if artist_val else ''
+        try:
+            position = float(props.Get('org.mpris.MediaPlayer2.Player', 'Position')) / 1000000.0
+        except Exception:
+            position = 0.0
+        try:
+            length = float(meta.get('mpris:length', 0)) / 1000000.0
+        except Exception:
+            length = 0.0
+        return {
+            'status': status,
+            'title': title,
+            'artist': artist,
+            'position': position,
+            'length': length
+        }
+    except Exception:
+        return None
+
+def format_meta(fmt, data):
+    if not data:
+        return ""
+    res = fmt
+    res = res.replace('{{status}}', data['status'])
+    res = res.replace('{{title}}', data['title'])
+    res = res.replace('{{artist}}', data['artist'])
+    res = res.replace('{{position}}', str(data['position']))
+    res = res.replace('{{mpris:length}}', str(data['length']))
+    return res
+
+def handle_control(cmd):
+    bus = dbus.SessionBus()
+    player = get_active_player(bus)
+    if not player:
+        return
+    proxy = bus.get_object(player, '/org/mpris/MediaPlayer2')
+    player_iface = dbus.Interface(proxy, 'org.mpris.MediaPlayer2.Player')
+    if cmd == 'play-pause':
+        player_iface.PlayPause()
+    elif cmd == 'previous':
+        player_iface.Previous()
+    elif cmd == 'next':
+        player_iface.Next()
+    elif cmd == 'play':
+        player_iface.Play()
+    elif cmd == 'pause':
+        player_iface.Pause()
+    elif cmd == 'stop':
+        player_iface.Stop()
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print("Usage: playerctl [cmd]")
+        sys.exit(0)
+
+    if args[0] in ('play-pause', 'previous', 'next', 'play', 'pause', 'stop'):
+        handle_control(args[0])
+        sys.exit(0)
+
+    follow = False
+    fmt = "{{status}}|{{title}}|{{artist}}"
+    if "--follow" in args:
+        follow = True
+        args.remove("--follow")
+
+    if "metadata" in args:
+        if "--format" in args:
+            idx = args.index("--format")
+            if idx + 1 < len(args):
+                fmt = args[idx + 1]
+        
+        bus = dbus.SessionBus()
+        if not follow:
+            player = get_active_player(bus)
+            if player:
+                data = get_metadata(bus, player)
+                if data:
+                    print(format_meta(fmt, data))
+            sys.exit(0)
+        else:
+            last_out = None
+            while True:
+                player = get_active_player(bus)
+                if player:
+                    data = get_metadata(bus, player)
+                    out = format_meta(fmt, data) if data else ""
+                else:
+                    out = ""
+                if out != last_out:
+                    print(out, flush=True)
+                    last_out = out
+                time.sleep(1)
+
+    if "status" in args:
+        bus = dbus.SessionBus()
+        player = get_active_player(bus)
+        if player:
+            data = get_metadata(bus, player)
+            if data:
+                print(data['status'])
+                sys.exit(0)
+        print("Stopped")
+        sys.exit(0)
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

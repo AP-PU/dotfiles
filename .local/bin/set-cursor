@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# set-cursor: Seamlessly switch cursor themes across Hyprland, GTK 3/4, X11, and GSettings
+
+CURRENT_THEME=$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | tr -d "'")
+CURRENT_SIZE=$(gsettings get org.gnome.desktop.interface cursor-size 2>/dev/null || echo "24")
+[[ -z "$CURRENT_SIZE" ]] && CURRENT_SIZE=24
+
+AVAILABLE=(
+  "catppuccin-mocha-pink-cursors"
+  "catppuccin-mocha-mauve-cursors"
+  "Bibata-Modern-Classic"
+  "Adwaita"
+)
+
+THEME="$1"
+SIZE="${2:-$CURRENT_SIZE}"
+
+# Show status
+if [[ "$THEME" == "status" || "$THEME" == "-l" || "$THEME" == "list" ]]; then
+  echo -e "\033[1;35m🐰 Active Cursor Theme:\033[0m \033[1;36m$CURRENT_THEME\033[0m (${CURRENT_SIZE}px)"
+  echo ""
+  echo -e "\033[1;33mAvailable themes:\033[0m"
+  echo "  • pink    - catppuccin-mocha-pink-cursors (Sakura / Rose Bunny accent)"
+  echo "  • mauve   - catppuccin-mocha-mauve-cursors (Pastel Lavender / Violet)"
+  echo "  • bibata  - Bibata-Modern-Classic (Clean rounded black & white)"
+  echo "  • default - Adwaita (Default system cursor)"
+  exit 0
+fi
+
+# Fuzzy alias matching
+case "${THEME,,}" in
+  1|pink|catppuccin-pink|mocha-pink)
+    THEME="catppuccin-mocha-pink-cursors"
+    ;;
+  2|mauve|lavender|catppuccin-mauve|mocha-mauve)
+    THEME="catppuccin-mocha-mauve-cursors"
+    ;;
+  3|bibata|classic|modern)
+    THEME="Bibata-Modern-Classic"
+    ;;
+  4|adwaita|default)
+    THEME="Adwaita"
+    ;;
+esac
+
+# Interactive prompt if no valid argument was provided
+if [[ -z "$THEME" ]] || ! printf '%s\n' "${AVAILABLE[@]}" | grep -qx "$THEME"; then
+  echo -e "\033[1;35m🐰 Bunny Girl Cursor Switcher\033[0m"
+  echo -e "Currently active: \033[1;36m$CURRENT_THEME\033[0m (${CURRENT_SIZE}px)"
+  echo ""
+  echo "Usage: cursor [pink | mauve | bibata | default] [size]"
+  echo ""
+  echo "Select a theme:"
+  echo "  1) pink    -> Catppuccin Mocha Pink  (Sakura / Bunny Pink accent)"
+  echo "  2) mauve   -> Catppuccin Mocha Mauve (Pastel Lavender / Violet accent)"
+  echo "  3) bibata  -> Bibata Modern Classic  (Minimalist rounded black / white)"
+  echo "  4) default -> Adwaita                (System default)"
+  echo ""
+  read -rp "Enter choice (1-4 or name) [default: pink]: " CHOICE
+  case "${CHOICE,,}" in
+    1|pink|catppuccin-pink|"") THEME="catppuccin-mocha-pink-cursors" ;;
+    2|mauve|lavender)          THEME="catppuccin-mocha-mauve-cursors" ;;
+    3|bibata|classic|modern)   THEME="Bibata-Modern-Classic" ;;
+    4|default|adwaita)         THEME="Adwaita" ;;
+    *) echo -e "\033[1;31m✖ Invalid choice: $CHOICE\033[0m"; exit 1 ;;
+  esac
+fi
+
+# 1. Apply live in Hyprland
+hyprctl setcursor "$THEME" "$SIZE" >/dev/null 2>&1
+
+# 2. Update GSettings (GNOME/GTK live apps)
+gsettings set org.gnome.desktop.interface cursor-theme "$THEME"
+gsettings set org.gnome.desktop.interface cursor-size "$SIZE"
+
+# 3. Update ~/.icons/default/index.theme (X11 / XWayland fallback)
+mkdir -p "$HOME/.icons/default"
+cat <<EOF > "$HOME/.icons/default/index.theme"
+[Icon Theme]
+Name=Default
+Comment=Default Cursor Theme
+Inherits=$THEME
+EOF
+
+# 4. Update GTK 3 & GTK 4 settings.ini
+for GTK_DIR in "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"; do
+  mkdir -p "$GTK_DIR"
+  if [[ -f "$GTK_DIR/settings.ini" ]]; then
+    sed -i "s/^gtk-cursor-theme-name=.*/gtk-cursor-theme-name=$THEME/" "$GTK_DIR/settings.ini"
+    sed -i "s/^gtk-cursor-theme-size=.*/gtk-cursor-theme-size=$SIZE/" "$GTK_DIR/settings.ini"
+  fi
+done
+
+# 5. Update ~/.config/hypr/looknfeel.lua for reboot persistence
+LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
+if [[ -f "$LOOKNFEEL" ]]; then
+  sed -i "s/hl\.env(\"XCURSOR_THEME\", \".*\")/hl.env(\"XCURSOR_THEME\", \"$THEME\")/" "$LOOKNFEEL"
+  sed -i "s/hl\.env(\"HYPRCURSOR_THEME\", \".*\")/hl.env(\"HYPRCURSOR_THEME\", \"$THEME\")/" "$LOOKNFEEL"
+  sed -i "s/hl\.env(\"XCURSOR_SIZE\", \".*\")/hl.env(\"XCURSOR_SIZE\", \"$SIZE\")/" "$LOOKNFEEL"
+  sed -i "s/hl\.env(\"HYPRCURSOR_SIZE\", \".*\")/hl.env(\"HYPRCURSOR_SIZE\", \"$SIZE\")/" "$LOOKNFEEL"
+fi
+
+echo -e "\033[1;32m✔ Cursor successfully switched to: \033[1;36m$THEME\033[0m \033[1;32m(${SIZE}px)\033[0m"

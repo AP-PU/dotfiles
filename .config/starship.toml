@@ -1,0 +1,28 @@
+format = """
+[╭─](#a99b7a)[ 󰚌 TENEBRIS ](bold #e75a50)[─](#4c4c4c)[ $directory ](bold #a99b7a)$git_branch$git_status$cmd_duration
+[╰─](#a99b7a)$character"""
+
+[directory]
+style = "bold #a99b7a"
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " 󰌾"
+read_only_style = "bold #e75a50"
+
+[git_branch]
+symbol = "󰘬 "
+style = "bold #e58980"
+format = "[─](#4c4c4c)[ $symbol$branch ]($style)"
+
+[git_status]
+style = "bold #e75a50"
+format = "[$all_status$ahead_behind ]($style)"
+
+[cmd_duration]
+min_time = 1000
+style = "bold #C0AF7F"
+format = "[─](#4c4c4c)[ 󱎫 $duration ]($style)"
+
+[character]
+success_symbol = "[❯](#e75a50) "
+error_symbol = "[❯](bold #F44336) "

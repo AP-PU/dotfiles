@@ -1,0 +1,13 @@
+[Unit]
+Description=Omarchy Automatic PNG Converter Daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/omarchy-auto-png-watch
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

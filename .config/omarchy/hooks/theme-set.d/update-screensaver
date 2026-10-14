@@ -1,0 +1,9 @@
+#!/bin/bash
+THEME_NAME="$1"
+THEME_DIR="$HOME/.config/omarchy/themes/$THEME_NAME"
+[[ -d "$THEME_DIR" ]] || THEME_DIR="/usr/share/omarchy/themes/$THEME_NAME"
+
+if [[ -f "$THEME_DIR/screensaver.txt" ]]; then
+  mkdir -p "$HOME/.config/omarchy/branding"
+  cp "$THEME_DIR/screensaver.txt" "$HOME/.config/omarchy/branding/screensaver.txt"
+fi

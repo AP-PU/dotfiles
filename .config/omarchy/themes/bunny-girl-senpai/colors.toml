@@ -1,0 +1,32 @@
+mode = "dark"
+
+# Bunny Girl Senpai — Mai Sakurajima (Rascal Does Not Dream of Bunny Girl Senpai)
+accent = "#e582a8"
+selection = "#38304f"
+muted = "#786f91"
+
+background = "#161420"
+dark_background = "#110f19"
+darker_background = "#0b0a10"
+lighter_background = "#221f30"
+
+foreground = "#ece6f4"
+dark_foreground = "#8b81a3"
+light_foreground = "#d2c8e3"
+bright_foreground = "#f9f6fd"
+
+red = "#ea768c"
+yellow = "#f2d194"
+orange = "#e89d82"
+green = "#8ec49f"
+cyan = "#7ecbd2"
+blue = "#8fa4df"
+magenta = "#d88ec5"
+brown = "#876673"
+
+bright_red = "#f28da1"
+bright_yellow = "#fae0a7"
+bright_green = "#9dd3ad"
+bright_cyan = "#92dbe1"
+bright_blue = "#a3b6eb"
+bright_magenta = "#e2a3d3"

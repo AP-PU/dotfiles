@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# omarchy:summary=Launch the Omarchy screensaver with media-awareness.
+# Skips screensaver if media or audio is actively playing, unless forced.
+
+if [[ "$1" == "force" ]]; then
+  exec /usr/share/omarchy/bin/omarchy-launch-screensaver "$@"
+fi
+
+is_audio_active() {
+  pactl list sink-inputs 2>/dev/null | grep -q 'Corked: no'
+}
+
+is_mpris_active() {
+  local service status
+  for service in $(busctl --user list 2>/dev/null | awk '/org\.mpris\.MediaPlayer2/ {print $1}'); do
+    status=$(busctl --user get-property "$service" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null)
+    if [[ "$status" == *'"Playing"'* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+if is_audio_active || is_mpris_active; then
+  logger -t omarchy-screensaver "Omarchy screensaver skipped: media or audio is currently playing"
+  # Reset idle cycle so system does not immediately transition to lock
+  omarchy-shell -q idle disable 2>/dev/null || true
+  omarchy-shell -q idle enable 2>/dev/null || true
+  exit 0
+fi
+
+exec /usr/share/omarchy/bin/omarchy-launch-screensaver "$@"

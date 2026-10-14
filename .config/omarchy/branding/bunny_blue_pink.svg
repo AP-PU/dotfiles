@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Blue to Pink subtle gradient -->
+    <linearGradient id="bluePinkGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#89dceb"/>
+      <stop offset="50%" stop-color="#cba6f7"/>
+      <stop offset="100%" stop-color="#f38ba8"/>
+    </linearGradient>
+    <linearGradient id="earBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#89b4fa"/>
+      <stop offset="100%" stop-color="#7aa2f7"/>
+    </linearGradient>
+    <linearGradient id="earPink" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff7597"/>
+      <stop offset="100%" stop-color="#f38ba8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left Ear Outer (Soft Blue) -->
+  <path d="M 21 34 C 15 24 16 7 24 6 C 30 5 30 20 28 33 Z" fill="url(#earBlue)"/>
+  <!-- Left Ear Inner (Vibrant Pink) -->
+  <path d="M 22 28 C 19 20 19 10 24 9 C 27 8 28 17 26 28 Z" fill="url(#earPink)"/>
+
+  <!-- Right Ear Outer (Soft Blue) -->
+  <path d="M 43 34 C 49 24 48 7 40 6 C 34 5 34 20 36 33 Z" fill="url(#earBlue)"/>
+  <!-- Right Ear Inner (Vibrant Pink) -->
+  <path d="M 42 28 C 45 20 45 10 40 9 C 37 8 36 17 38 28 Z" fill="url(#earPink)"/>
+
+  <!-- Head (Gentle Ice-Blue tinted white) -->
+  <ellipse cx="32" cy="42" rx="19" ry="16" fill="#eff3fb" stroke="#89b4fa" stroke-width="1.8"/>
+
+  <!-- Cheeks Blush (Soft Pink) -->
+  <circle cx="21" cy="45" r="4.5" fill="#f38ba8" opacity="0.6"/>
+  <circle cx="43" cy="45" r="4.5" fill="#f38ba8" opacity="0.6"/>
+
+  <!-- Cute Eyes (Deep Shonan Blue) -->
+  <ellipse cx="24" cy="40" rx="2.5" ry="3.5" fill="#1e1e2e"/>
+  <circle cx="23" cy="38.5" r="1.2" fill="#ffffff"/>
+  <circle cx="25" cy="41.5" r="0.6" fill="#89dceb"/>
+
+  <ellipse cx="40" cy="40" rx="2.5" ry="3.5" fill="#1e1e2e"/>
+  <circle cx="39" cy="38.5" r="1.2" fill="#ffffff"/>
+  <circle cx="41" cy="41.5" r="0.6" fill="#89dceb"/>
+
+  <!-- Little Nose (Cute Pink) -->
+  <polygon points="32,44 30.5,42.5 33.5,42.5" fill="#f38ba8"/>
+
+  <!-- Mouth (Smile) -->
+  <path d="M 30.5 45 Q 32 46.5 32 45 Q 32 46.5 33.5 45" stroke="#6c6784" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+
+  <!-- Hair Clip on Ear (Mai's signature pink clip) -->
+  <rect x="23" y="19" width="8" height="3" rx="1.5" fill="#f38ba8" transform="rotate(-15, 27, 20)"/>
+</svg>

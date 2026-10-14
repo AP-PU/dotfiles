@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Gothic Rice 4-Panel Dashboard Launcher
+hyprctl dispatch "hl.dsp.focus({ workspace = '5' })"
+sleep 0.2
+foot -T "btop" btop &
+sleep 0.2
+foot -T "cava" cava &
+sleep 0.2
+foot -T "fastfetch" bash -c "fastfetch; exec bash" &
+sleep 0.2
+foot -T "cmatrix" cmatrix -C red &

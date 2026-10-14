@@ -1,0 +1,32 @@
+# Example Git Configuration
+# Copy this to ~/.config/git/config or ~/.gitconfig and edit your name and email.
+
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+[init]
+	defaultBranch = main
+[pull]
+	rebase = true
+[push]
+	autoSetupRemote = true
+[diff]
+	algorithm = histogram
+	colorMoved = plain
+	mnemonicPrefix = true
+[commit]
+	verbose = true
+[column]
+	ui = auto
+[branch]
+	sort = -committerdate
+[tag]
+	sort = -version:refname
+[rerere]
+	enabled = true
+	autoupdate = true
+[user]
+	name = Your Name
+	email = your-email@example.com

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Omarchy RAM Trimmer: Reclaims unneeded kernel caches and synchronizes buffers safely.
+sync
+if [[ $EUID -eq 0 ]]; then
+  echo 3 > /proc/sys/vm/drop_caches
+else
+  sudo bash -c 'echo 3 > /proc/sys/vm/drop_caches'
+fi
+echo "RAM trimmed successfully. Current memory usage:"
+free -h

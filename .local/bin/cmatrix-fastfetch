@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""
+cmatrix-fastfetch: Beautiful Matrix Digital Rain with Fastfetch integration.
+- Standalone mode: Live matrix rain cascading around the Fastfetch HUD.
+- Intro mode (--burst / -b): Matrix digital rain cascade that seamlessly settles into fastfetch.
+"""
+
+import os
+import sys
+import time
+import random
+import signal
+import shutil
+import termios
+import tty
+import select
+import subprocess
+import re
+
+# Matrix Characters: Japanese Katakana + Alphanumeric
+KATAKANA = [chr(i) for i in range(0x30A0, 0x30F6)]
+CHARS = KATAKANA + list("0123456789ABCDEF$#@%&*+=~<>:;|/\\")
+
+ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
+def visible_len(s):
+    return len(ANSI_ESCAPE.sub('', s))
+
+THEMES = {
+    "pink": {
+        "head": "\033[1;38;2;255;255;255m",
+        "lead": "\033[1;38;2;255;150;200m",
+        "trail": "\033[38;2;243;139;168m",
+        "dim": "\033[38;2;140;60;100m",
+        "box_border": "\033[1;38;2;203;166;247m",
+        "box_bg": "\033[48;2;14;14;20m",
+    },
+    "green": {
+        "head": "\033[1;38;2;255;255;255m",
+        "lead": "\033[1;38;2;180;255;180m",
+        "trail": "\033[38;2;0;255;65m",
+        "dim": "\033[38;2;0;100;30m",
+        "box_border": "\033[1;38;2;0;255;100m",
+        "box_bg": "\033[48;2;10;16;12m",
+    },
+    "cyan": {
+        "head": "\033[1;38;2;255;255;255m",
+        "lead": "\033[1;38;2;180;240;255m",
+        "trail": "\033[38;2;137;220;235m",
+        "dim": "\033[38;2;40;100;120m",
+        "box_border": "\033[1;38;2;137;180;250m",
+        "box_bg": "\033[48;2;12;14;22m",
+    }
+}
+
+RESET = "\033[0m"
+HIDE_CURSOR = "\033[?25l"
+SHOW_CURSOR = "\033[?25h"
+CLEAR_SCREEN = "\033[2J\033[H"
+
+class MatrixDrop:
+    def __init__(self, col, max_y):
+        self.col = col
+        self.max_y = max(10, max_y)
+        self.y = random.randint(-self.max_y, 0)
+        self.speed = random.choice([1, 1, 2])
+        self.length = random.randint(6, max(8, self.max_y - 4))
+        self.char = random.choice(CHARS)
+        self.ticks = 0
+
+    def update(self):
+        self.ticks += 1
+        if self.ticks % self.speed == 0:
+            self.y += 1
+            if self.y - self.length > self.max_y:
+                self.y = random.randint(-12, 0)
+                self.speed = random.choice([1, 1, 2])
+                self.length = random.randint(6, max(8, self.max_y - 4))
+        if random.random() < 0.15:
+            self.char = random.choice(CHARS)
+
+
+def get_specs():
+    """Build clean specs lines matching the Bunny Girl theme."""
+    return [
+        "┌─ 󰌢 Aspire E5-573G (V3.72)",
+        "├─ 󰍛 Intel(R) Core(TM) i3-4005U",
+        "├─ 󰢮 NVIDIA GeForce 920M",
+        "├─ 󰢮 Intel Haswell-ULT Integrated Graphics",
+        "├─ 󰍛 4.8 GiB / 11.59 GiB (41%)",
+        "├─ 󰋊 0 B / 19.26 GiB (0%)",
+        "└─ 󰍹 1366x768",
+        "",
+        "┌─  bash 5.3.15",
+        "├─  foot 1.28.0",
+        "└─  Hyprland 0.56.2 (Wayland)",
+        "",
+        "┌─  lohith@Dominus",
+        "├─  Omarchy x86_64",
+        "└─  Linux 7.2.5-3-omarchy"
+    ]
+
+
+def run_burst(duration=1.5):
+    """Run brief cmatrix cascade and then cleanly execute fastfetch."""
+    try:
+        # Run cmatrix for a brief moment in non-interactive / timeout
+        p = subprocess.Popen(["cmatrix", "-ab", "-C", "magenta"])
+        time.sleep(duration)
+        p.send_signal(signal.SIGINT)
+        p.wait()
+    except Exception:
+        pass
+    os.system("clear")
+    os.execvp("fastfetch", ["fastfetch", "-c", os.path.expanduser("~/.config/fastfetch/config.jsonc")])
+
+
+def main():
+    args = sys.argv[1:]
+    if "--burst" in args or "-b" in args or "--intro" in args:
+        run_burst()
+        return
+
+    theme_keys = ["pink", "green", "cyan"]
+    theme_idx = 0
+    cur_theme = THEMES[theme_keys[theme_idx]]
+
+    timed_seconds = None
+    for i, arg in enumerate(args):
+        if arg in ("--timed", "-t") and i + 1 < len(args):
+            try:
+                timed_seconds = float(args[i + 1])
+            except ValueError:
+                pass
+        elif arg in ("--theme", "-C") and i + 1 < len(args):
+            th = args[i + 1].lower()
+            if th in THEMES:
+                cur_theme = THEMES[th]
+
+    fd = sys.stdin.fileno()
+    old_term = None
+    try:
+        old_term = termios.tcgetattr(fd)
+        tty.setcbreak(fd)
+    except Exception:
+        pass
+
+    sys.stdout.write(HIDE_CURSOR + CLEAR_SCREEN)
+    sys.stdout.flush()
+
+    def cleanup(*_):
+        sys.stdout.write(SHOW_CURSOR + CLEAR_SCREEN)
+        sys.stdout.flush()
+        if old_term:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
+            except Exception:
+                pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGTERM, cleanup)
+
+    specs_lines = get_specs()
+    card_w = max(visible_len(l) for l in specs_lines) + 6
+    card_h = len(specs_lines) + 2
+
+    start_time = time.time()
+    cols, rows = shutil.get_terminal_size()
+    drops = [MatrixDrop(c, rows) for c in range(0, cols, 2)]
+
+    try:
+        while True:
+            # Check terminal resize
+            new_cols, new_rows = shutil.get_terminal_size()
+            if new_cols != cols or new_rows != rows:
+                cols, rows = new_cols, new_rows
+                drops = [MatrixDrop(c, rows) for c in range(0, cols, 2)]
+                sys.stdout.write(CLEAR_SCREEN)
+
+            # Check keypress
+            try:
+                r, _, _ = select.select([sys.stdin], [], [], 0.0)
+                if r:
+                    ch = sys.stdin.read(1)
+                    if ch and ch in ('q', 'Q', '\x1b', '\n', '\r'):
+                        break
+                    elif ch and ch in ('c', 'C'):
+                        theme_idx = (theme_idx + 1) % len(theme_keys)
+                        cur_theme = THEMES[theme_keys[theme_idx]]
+            except Exception:
+                pass
+
+            if timed_seconds and (time.time() - start_time) >= timed_seconds:
+                break
+
+            box_x = max(2, (cols - card_w) // 2)
+            box_y = max(1, (rows - card_h) // 2)
+
+            buf = []
+
+            # 1. Matrix digital rain
+            for drop in drops:
+                drop.update()
+                col = drop.col
+                y = drop.y
+
+                if 0 <= y < rows:
+                    if not (box_y <= y < box_y + card_h and box_x <= col < box_x + card_w):
+                        buf.append(f"\033[{y+1};{col+1}H{cur_theme['head']}{drop.char}{RESET}")
+
+                for i in range(1, drop.length):
+                    py = y - i
+                    if 0 <= py < rows:
+                        if box_y <= py < box_y + card_h and box_x <= col < box_x + card_w:
+                            continue
+                        color = cur_theme["lead"] if i < 3 else (cur_theme["trail"] if i < drop.length - 3 else cur_theme["dim"])
+                        ch = random.choice(CHARS) if random.random() < 0.08 else drop.char
+                        buf.append(f"\033[{py+1};{col+1}H{color}{ch}{RESET}")
+
+                tail_y = y - drop.length
+                if 0 <= tail_y < rows:
+                    if not (box_y <= tail_y < box_y + card_h and box_x <= col < box_x + card_w):
+                        buf.append(f"\033[{tail_y+1};{col+1}H ")
+
+            # 2. Render Fastfetch card
+            border_c = cur_theme["box_border"]
+            bg_c = cur_theme["box_bg"]
+            
+            # Top card border
+            top_line = f"╭{'─' * (card_w - 2)}╮"
+            buf.append(f"\033[{box_y};{box_x}H{bg_c}{border_c}{top_line}{RESET}")
+
+            # Content
+            for idx, sline in enumerate(specs_lines):
+                cur_y = box_y + 1 + idx
+                pad = card_w - 4 - visible_len(sline)
+                padding_str = " " * max(0, pad)
+                buf.append(f"\033[{cur_y};{box_x}H{bg_c}{border_c}│{RESET}{bg_c}  {sline}{padding_str}{border_c}│{RESET}")
+
+            # Bottom card border with interactive controls
+            hint = " [q: exit | c: color] "
+            dash_left = (card_w - 2 - len(hint)) // 2
+            dash_right = card_w - 2 - len(hint) - dash_left
+            bottom_line = f"╰{'─' * max(0, dash_left)}{cur_theme['trail']}{hint}{border_c}{'─' * max(0, dash_right)}╯"
+            buf.append(f"\033[{box_y + card_h - 1};{box_x}H{bg_c}{border_c}{bottom_line}{RESET}")
+
+            sys.stdout.write("".join(buf))
+            sys.stdout.flush()
+            time.sleep(0.04)
+
+    finally:
+        cleanup()
+
+if __name__ == "__main__":
+    main()

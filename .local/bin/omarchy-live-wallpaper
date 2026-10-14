@@ -1,0 +1,114 @@
+#!/bin/bash
+set -euo pipefail
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy"
+CURRENT_FILE="$CONFIG_DIR/live-wallpaper.current"
+MPVPAPER="$HOME/.local/bin/mpvpaper"
+
+mkdir -p "$CONFIG_DIR"
+
+resolve_video_for_theme() {
+  local theme="${1:-}"
+  if [[ -z "$theme" ]]; then
+    theme=$(omarchy theme current 2>/dev/null || true)
+  fi
+
+  # Normalize lower case without spaces
+  local norm
+  norm=$(echo "$theme" | tr '[:upper:]' '[:lower:]' | tr -s ' ' '-' | tr -cd '[:alnum:]-')
+
+  case "$norm" in
+    *musashi*|*vagabond*)
+      echo "/mnt/storage/Downloads/miyamoto-musashi-wallpaperwaifu-com.mp4"
+      return 0
+      ;;
+    *zero*2*|*zero*two*|*franxx*)
+      echo "/mnt/storage/Downloads/zero-two-moonlight-rays-wallpaperwaifu-com.mp4"
+      return 0
+      ;;
+  esac
+
+  # Check if theme directory has a live.mp4
+  local theme_dir="$CONFIG_DIR/themes/$norm"
+  if [[ -f "$theme_dir/live.mp4" ]]; then
+    readlink -f "$theme_dir/live.mp4"
+    return 0
+  fi
+
+  local user_theme_dir="$CONFIG_DIR/themes/$theme"
+  if [[ -f "$user_theme_dir/live.mp4" ]]; then
+    readlink -f "$user_theme_dir/live.mp4"
+    return 0
+  fi
+
+  return 1
+}
+
+cmd="${1:-status}"
+
+case "$cmd" in
+  run)
+    if [[ ! -f "$CURRENT_FILE" ]]; then
+      echo "No current live wallpaper configured."
+      exit 0
+    fi
+    video_path=$(cat "$CURRENT_FILE")
+    if [[ ! -f "$video_path" ]]; then
+      echo "Configured video file does not exist: $video_path"
+      exit 1
+    fi
+    echo "Starting mpvpaper with $video_path..."
+    # -p: auto pause when completely covered by windows to save CPU/GPU
+    # -l bottom: render in layer level 1 (above static omarchy-background, below windows)
+    # -o: loop with hardware decoding and no audio
+    exec "$MPVPAPER" -p -l bottom -o "no-audio loop hwdec=auto --pause=no" ALL "$video_path"
+    ;;
+
+  apply-theme)
+    target_theme="${2:-}"
+    video=$(resolve_video_for_theme "$target_theme" || true)
+    if [[ -n "$video" && -f "$video" ]]; then
+      echo "$video" > "$CURRENT_FILE"
+      systemctl --user restart omarchy-live-wallpaper.service
+      echo "Applied live wallpaper for theme: $video"
+    else
+      rm -f "$CURRENT_FILE"
+      systemctl --user stop omarchy-live-wallpaper.service 2>/dev/null || true
+      echo "No live wallpaper for theme ($target_theme), stopped live service."
+    fi
+    ;;
+
+  start)
+    video_path="${2:-}"
+    if [[ -z "$video_path" ]]; then
+      video_path=$(resolve_video_for_theme "" || true)
+    fi
+    if [[ -z "$video_path" || ! -f "$video_path" ]]; then
+      echo "Error: Video file not found: $video_path"
+      exit 1
+    fi
+    echo "$video_path" > "$CURRENT_FILE"
+    systemctl --user restart omarchy-live-wallpaper.service
+    echo "Live wallpaper service started with $video_path"
+    ;;
+
+  stop)
+    rm -f "$CURRENT_FILE"
+    systemctl --user stop omarchy-live-wallpaper.service 2>/dev/null || true
+    echo "Live wallpaper service stopped."
+    ;;
+
+  status)
+    if [[ -f "$CURRENT_FILE" ]]; then
+      echo "Current configured wallpaper: $(cat "$CURRENT_FILE")"
+    else
+      echo "No live wallpaper configured."
+    fi
+    systemctl --user status omarchy-live-wallpaper.service --no-pager || true
+    ;;
+
+  *)
+    echo "Usage: omarchy-live-wallpaper {run|apply-theme [theme]|start [video]|stop|status}"
+    exit 1
+    ;;
+esac

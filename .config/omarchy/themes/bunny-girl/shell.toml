@@ -1,0 +1,61 @@
+[font]
+base-size = 12
+
+[hyprland]
+active-border = "#f38ba8"
+active-border-foreground = "#ece9f5"
+
+[bar]
+background = "#09090e"
+background-alpha = 0.70
+text = "#ece9f5"
+
+[popups]
+background = "#09090e"
+background-alpha = 0.95
+text = "#ece9f5"
+border = "#cba6f7"
+border-alpha = 0.60
+border-width = 1
+
+[notifications]
+background = "#09090e"
+background-alpha = 0.94
+text = "#ece9f5"
+border = "#564f6e"
+border-alpha = 0.60
+border-width = 1
+
+[menu]
+background = "#09090e"
+background-alpha = 0.94
+text = "#ece9f5"
+border = "#564f6e"
+border-alpha = 0.60
+
+[launcher]
+background = "#09090e"
+background-alpha = 0.80
+text = "#ece9f5"
+border = "#564f6e"
+border-alpha = 0.50
+
+[tooltip]
+background = "#09090e"
+background-alpha = 0.85
+text = "#ece9f5"
+border = "#564f6e"
+border-alpha = 0.50
+
+[controls]
+normal-color = "#ece9f5"
+normal-fill-alpha = 0.08
+normal-border = "#564f6e"
+normal-border-width = 1
+normal-border-alpha = 0.40
+
+hover-cursor-color = "#ece9f5"
+hover-cursor-fill-alpha = 0.16
+hover-cursor-border = "#f38ba8"
+hover-cursor-border-width = 1
+hover-cursor-border-alpha = 0.60

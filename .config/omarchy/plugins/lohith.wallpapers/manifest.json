@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "lohith.wallpapers",
+  "name": "Wallpapers & Palettes",
+  "version": "1.0.0",
+  "author": "Lohith",
+  "description": "One-click wallpaper and theme color palette switcher",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Wallpapers & Palettes",
+    "description": "Switch wallpapers and system color palettes in one click",
+    "category": "Theme",
+    "allowMultiple": false
+  }
+}

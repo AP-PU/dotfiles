@@ -1,0 +1,27 @@
+{
+  "apps": {"icon":"󰈸","label":"Apps","aliases":["app","applications"],"provider":"apps"},
+  "style": {"icon":"󰔎","label":"Style"},
+  "about": {"icon":"󰘬","label":"About","action":"omarchy-launch-about"},
+  // >>> umami managed block (Background Umami) - do not edit between these lines >>>
+  "style.background": {"icon":"\uf03e","label":"Background","aliases":["background","wallpaper"]},
+  "style.background.stock": {"icon":"\uf03e","label":"Theme Backgrounds","description":"Stock picker","action":"background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\"; '$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-unpin'"},
+  "style.background.umami": {"icon":"\uf03e","label":"Umami","description":"Custom, all, shuffle","aliases":["umami","background umami","wallpapers","custom background","shuffle"],"when":"test -x '$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-browse'"},
+  "style.background.umami.folder": {"icon":"\uf03e","label":"Custom Folder","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-browse' folder"},
+  "style.background.umami.all": {"icon":"\uf03e","label":"All Backgrounds","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-browse' all"},
+  "style.background.umami.shuffle": {"icon":"\uf03e","label":"Shuffle"},
+  "style.background.umami.shuffle.now": {"icon":"\uf03e","label":"Shuffle Now","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' now"},
+  "style.background.umami.shuffle.5": {"icon":"\uf03e","label":"Every 5 Min","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' start 5","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is interval 5"},
+  "style.background.umami.shuffle.15": {"icon":"\uf03e","label":"Every 15 Min","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' start 15","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is interval 15"},
+  "style.background.umami.shuffle.30": {"icon":"\uf03e","label":"Every 30 Min","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' start 30","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is interval 30"},
+  "style.background.umami.shuffle.60": {"icon":"\uf03e","label":"Every 60 Min","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' start 60","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is interval 60"},
+  "style.background.umami.shuffle.custom": {"icon":"\uf03e","label":"Custom\u2026","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' custom","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is custom"},
+  "style.background.umami.shuffle.off": {"icon":"\uf03e","label":"Off","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' stop","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is off"},
+  "style.background.umami.from": {"icon":"\uf03e","label":"Shuffle From"},
+  "style.background.umami.from.theme": {"icon":"\uf03e","label":"This Theme","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' scope theme","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is scope theme"},
+  "style.background.umami.from.folder": {"icon":"\uf03e","label":"Custom Folder","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' scope folder","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is scope folder"},
+  "style.background.umami.from.all": {"icon":"\uf03e","label":"All Backgrounds","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' scope all","checked":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/libexec/umami-shuffle' is scope all"},
+  "style.background.umami.open": {"icon":"\uf03e","label":"Open Folder","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-folder' open"},
+  "style.background.umami.change": {"icon":"\uf03e","label":"Change Folder\u2026","action":"omarchy-launch-floating-terminal-with-presentation '$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-folder' choose"},
+  "style.background.umami.remove": {"icon":"\uf03e","label":"Remove Added","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-remove'"},
+  "style.background.umami.restore": {"icon":"\uf03e","label":"Restore Default","action":"'$HOME/.config/omarchy/plugins/io.github.samjage.background-umami/bin/umami-restore'"}
+}

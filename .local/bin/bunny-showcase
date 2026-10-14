@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# Bunny Girl Rice Showcase Launcher
+# Spawns an aesthetic multi-pane showcase layout in tmux
+
+SESSION="showcase"
+
+# If session already exists, attach to it
+tmux has-session -t "$SESSION" 2>/dev/null && exec tmux attach-session -t "$SESSION"
+
+# Create new session with main terminal (fastfetch)
+tmux new-session -d -s "$SESSION" -n "Rice" "bash -c 'fastfetch; exec bash'"
+
+# Split horizontally: Left = main, Right = visualizers
+tmux split-window -h -t "$SESSION":0 -p 48 "btop"
+
+# Split right pane vertically: Top-Right = btop, Bottom-Right = cava
+tmux split-window -v -t "$SESSION":0.1 -p 45 "cava"
+
+# Split bottom-right: Bottom-Right = pipes.sh
+tmux split-window -v -t "$SESSION":0.2 -p 50 "pipes.sh -p 3 -R -c 5 -c 1 -c 4 -t 1"
+
+# Select main pane on the left
+tmux select-pane -t "$SESSION":0.0
+
+# Attach to session
+tmux attach-session -t "$SESSION"

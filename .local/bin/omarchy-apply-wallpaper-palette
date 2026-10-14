@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# Applies a wallpaper and extracts/applies a matching color palette across Omarchy.
+set -e
+
+IMAGE="$1"
+if [[ -z "$IMAGE" || ! -f "$IMAGE" ]]; then
+  echo "Usage: $0 <image-path>" >&2
+  exit 1
+fi
+
+IMAGE_PATH="$(realpath "$IMAGE")"
+THEME_DIR="$HOME/.local/state/omarchy/current/theme"
+COLORS_FILE="$THEME_DIR/colors.toml"
+SHELL_FILE="$THEME_DIR/shell.toml"
+USER_SHELL_FILE="$HOME/.config/omarchy/shell.toml"
+
+# 1. Apply wallpaper immediately
+omarchy-theme-bg-set "$IMAGE_PATH"
+
+# 2. Extract colors using Python PIL
+PALETTE_JSON=$(/usr/bin/python3 - << EOF
+import os
+import sys
+import json
+import colorsys
+from PIL import Image
+
+image_path = "$IMAGE_PATH"
+
+try:
+    img = Image.open(image_path).convert("RGB")
+    img.thumbnail((120, 120))
+    quantized = img.quantize(colors=16, method=Image.Quantize.FASTOCTREE)
+    raw_palette = quantized.getpalette()[:48]
+
+    colors = []
+    for i in range(0, len(raw_palette), 3):
+        r, g, b = raw_palette[i], raw_palette[i+1], raw_palette[i+2]
+        h, l, s = colorsys.rgb_to_hls(r/255.0, g/255.0, b/255.0)
+        colors.append((r, g, b, h, l, s))
+
+    # Find prominent saturated colors for accent
+    vibrant = [c for c in colors if 0.15 < c[4] < 0.85 and c[5] > 0.15]
+    vibrant.sort(key=lambda c: c[5], reverse=True)
+
+    if vibrant:
+        accent = vibrant[0]
+        secondary = vibrant[1] if len(vibrant) > 1 else vibrant[0]
+    else:
+        accent = colors[0] if colors else (231, 90, 80, 0, 0.5, 0.5)
+        secondary = colors[1] if len(colors) > 1 else accent
+
+    acc_hex = f"#{accent[0]:02x}{accent[1]:02x}{accent[2]:02x}"
+    sec_hex = f"#{secondary[0]:02x}{secondary[1]:02x}{secondary[2]:02x}"
+    print(json.dumps({"accent": acc_hex, "secondary": sec_hex}))
+except Exception as e:
+    print(json.dumps({"accent": "#E75A50", "secondary": "#A99B7A", "error": str(e)}))
+EOF
+)
+
+ACC_HEX=$(echo "$PALETTE_JSON" | jq -r '.accent // "#E75A50"')
+SEC_HEX=$(echo "$PALETTE_JSON" | jq -r '.secondary // "#A99B7A"')
+ACC_NO_HASH="${ACC_HEX#\#}"
+SEC_NO_HASH="${SEC_HEX#\#}"
+
+# 3. Write colors.toml
+cat << EOF > "$COLORS_FILE"
+accent = "$ACC_HEX"
+cursor = "$SEC_HEX"
+foreground = "#efebdc"
+background = "#111114"
+selection_foreground = "#111114"
+selection_background = "$ACC_HEX"
+
+mode = "dark"
+selection = "#251819"
+muted = "#89856b"
+
+hyprland_active_border = "rgba(${ACC_NO_HASH}ee) rgba(${SEC_NO_HASH}ee) 45deg"
+hyprland_inactive_border = "rgba(18181bee)"
+
+dark_background = "#111114"
+darker_background = "#0a0a0c"
+lighter_background = "#1a1a20"
+
+dark_foreground = "$SEC_HEX"
+light_foreground = "#f4f2e8"
+bright_foreground = "#efebdc"
+
+red = "$ACC_HEX"
+yellow = "$SEC_HEX"
+orange = "$ACC_HEX"
+green = "$ACC_HEX"
+cyan = "$SEC_HEX"
+blue = "$ACC_HEX"
+magenta = "$SEC_HEX"
+brown = "$SEC_HEX"
+
+bright_red = "$ACC_HEX"
+bright_yellow = "$SEC_HEX"
+bright_green = "$SEC_HEX"
+bright_cyan = "#888888"
+bright_blue = "$ACC_HEX"
+bright_magenta = "$SEC_HEX"
+
+color0 = "#1B1B1B"
+color1 = "$ACC_HEX"
+color2 = "$ACC_HEX"
+color3 = "$SEC_HEX"
+color4 = "$ACC_HEX"
+color5 = "$SEC_HEX"
+color6 = "$SEC_HEX"
+color7 = "#E1CE98"
+color8 = "#817f68"
+color9 = "$ACC_HEX"
+color10 = "$SEC_HEX"
+color11 = "$SEC_HEX"
+color12 = "$ACC_HEX"
+color13 = "$SEC_HEX"
+color14 = "#888888"
+color15 = "#efebdc"
+EOF
+
+# 4. Update ~/.config/omarchy/shell.toml with new active colors
+if [[ -f "$USER_SHELL_FILE" ]]; then
+  sed -i -E "s/active = \"#[0-9A-Fa-f]{6}\"/active = \"$ACC_HEX\"/g" "$USER_SHELL_FILE"
+  sed -i -E "s/active-border = \".*\"/active-border = \"rgba(${ACC_NO_HASH}ee) rgba(${SEC_NO_HASH}ee) 45deg\"/g" "$USER_SHELL_FILE"
+  sed -i -E "s/active-border-foreground = \".*\"/active-border-foreground = \"$ACC_HEX\"/g" "$USER_SHELL_FILE"
+  sed -i -E "s/border = \"#[0-9A-Fa-f]{6}\"/border = \"$ACC_HEX\"/g" "$USER_SHELL_FILE"
+  sed -i -E "s/selected-text = \"#[0-9A-Fa-f]{6}\"/selected-text = \"$ACC_HEX\"/g" "$USER_SHELL_FILE"
+  sed -i -E "s/selected-border = \"#[0-9A-Fa-f]{6}\"/selected-border = \"$ACC_HEX\"/g" "$USER_SHELL_FILE"
+fi
+
+# 5. Update live Hyprland window border in looknfeel.lua
+HYPR_LUA="$HOME/.config/hypr/looknfeel.lua"
+if [[ -f "$HYPR_LUA" ]]; then
+  sed -i -E "s/active_border = \{ colors = \{ \"rgba\([0-9a-fA-F]{8}\)\", \"rgba\([0-9a-fA-F]{8}\)\" \}/active_border = { colors = { \"rgba(${ACC_NO_HASH,,}ee)\", \"rgba(${SEC_NO_HASH,,}ee)\" }/g" "$HYPR_LUA"
+  hyprctl reload >/dev/null 2>&1 || true
+fi
+
+# 6. Update dynamic templates and all applications (terminals, editors, browsers, GTK)
+omarchy-theme-set-templates 2>/dev/null || true
+omarchy-theme-set-gnome 2>/dev/null || true
+omarchy-theme-set-foot 2>/dev/null || true
+omarchy-theme-set-vscode 2>/dev/null || true
+omarchy-theme-set-browser 2>/dev/null || true
+omarchy-restart-terminal 2>/dev/null || true
+omarchy-restart-btop 2>/dev/null || true
+
+# 7. Notify live shell of new palette
+if [[ -f "$COLORS_FILE" && -f "$USER_SHELL_FILE" ]]; then
+  colors_payload=$(base64 -w 0 "$COLORS_FILE")
+  shell_payload=$(base64 -w 0 "$USER_SHELL_FILE")
+  omarchy-shell shell applyTheme "$colors_payload" "$shell_payload" 2>/dev/null || true
+fi
+
+omarchy-notification-send "Theme Palette Updated" "$(basename "$IMAGE_PATH") • Accent: $ACC_HEX" -t 2000 2>/dev/null || true
+echo "Applied wallpaper and palette for $IMAGE_PATH (Accent: $ACC_HEX, Secondary: $SEC_HEX)"

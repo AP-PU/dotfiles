@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "lohith.nightlight",
+  "name": "Night Light",
+  "version": "1.0.0",
+  "author": "Lohith",
+  "description": "Toggle night light display color temperature",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Night Light",
+    "description": "Toggle night light display color temperature",
+    "category": "Display",
+    "allowMultiple": false
+  }
+}

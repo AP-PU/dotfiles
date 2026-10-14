@@ -100,7 +100,7 @@ yay -S apple_cursor
 
 1. **Clone this repository**:
    ```bash
-   git clone https://github.com/<your-username>/dotfiles.git ~/dotfiles
+   git clone https://github.com/AP-PU/dotfiles.git ~/dotfiles
    cd ~/dotfiles
    ```
 

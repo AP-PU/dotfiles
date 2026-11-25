@@ -171,7 +171,9 @@ done
 
 # 4. Deploy Custom Binaries (.local/bin)
 log_step "Deploying Custom User Scripts (.local/bin/)"
-mkdir -p "${TARGET_DIR}/.local/bin"
+if ! $DRY_RUN; then
+  mkdir -p "${TARGET_DIR}/.local/bin"
+fi
 
 if [[ -d "${DOTFILES_DIR}/.local/bin" ]]; then
   for bin_file in "${DOTFILES_DIR}/.local/bin"/*; do
@@ -185,7 +187,9 @@ fi
 
 # 5. Deploy Custom Fonts (.local/share/fonts)
 log_step "Deploying Custom Fonts (.local/share/fonts/)"
-mkdir -p "${TARGET_DIR}/.local/share/fonts"
+if ! $DRY_RUN; then
+  mkdir -p "${TARGET_DIR}/.local/share/fonts"
+fi
 
 if [[ -d "${DOTFILES_DIR}/.local/share/fonts" ]]; then
   for font_file in "${DOTFILES_DIR}/.local/share/fonts"/*; do
